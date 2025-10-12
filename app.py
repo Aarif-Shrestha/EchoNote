@@ -5,13 +5,19 @@ import tempfile
 import os
 import subprocess
 import json
+import re  
 
-# ===== Load Whisper model
+#  Helper function for stricter greeting matching
+def is_strict_greeting(text):
+    greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
+    return any(re.fullmatch(rf"\b{greet}\b", text.strip().lower()) for greet in greetings)
+
+# Load Whisper model
 @st.cache_resource
 def load_whisper_model():
     return whisper.load_model("base")
 
-# ===== Check if Phi-3 is available
+#  Check Phi-3  available
 def is_model_available(model_name="phi3:mini"):
     try:
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
@@ -20,21 +26,20 @@ def is_model_available(model_name="phi3:mini"):
         st.error(" Could not connect to Ollama. Is it running?")
         return False
 
-# ===== Transcribe audio
+# Transcribe audio
 def transcribe_audio(audio_path):
-    st.info("🔍 Transcribing... please wait.")
+    st.info(" Transcribing... please wait.")
     model = load_whisper_model()
     result = model.transcribe(audio_path)
     return result["text"]
 
-# ===== Ask a question via Ollama with conversational context
+# Ask a question via Ollama with conversational context 
 def ask_phi3(transcript, question, chat_history, model_name="phi3:mini"):
     if not is_model_available(model_name):
-        st.error(f" Model '{model_name}' not found in Ollama.\n\nRun:\n⁠  bash\nollama pull {model_name}  ⁠")
+        st.error(f" Model '{model_name}' not found in Ollama.\n\nRun:\n⁠  bash\nollama pull {model_name}  ⁠")
         return None
 
     with st.spinner(" Generating response with Phi-3..."):
-        # Filter out small talk
         filtered_history = [
             c for c in chat_history
             if c["question"].lower() not in ["thanks", "thank you", "thank u"]
@@ -53,7 +58,7 @@ Here is the conversation history for context:
 
 {history_context}
 
-Now, answer the following question about the meeting, keeping the conversation flow natural and referencing prior questions or answers if relevant:
+Answer the following question **concisely**, in **no more than 5 lines**:
 {question}
 """
         try:
@@ -66,7 +71,7 @@ Now, answer the following question about the meeting, keeping the conversation f
             st.error(f" Error from Ollama: {e}")
             return None
 
-# ===== Load/save chat history
+# Save chat history
 def load_chat_history():
     try:
         if os.path.exists("chat_history.json"):
@@ -84,32 +89,39 @@ def save_chat_history(history):
     except Exception as e:
         st.error(f" Could not save chat history: {e}")
 
-# ===== Streamlit setup
+# Streamlit setup
 st.set_page_config(page_title=" Offline Meeting Assistant", layout="centered")
 st.markdown("<h1 style='text-align: center;'> Offline Meeting Assistant</h1>", unsafe_allow_html=True)
 st.caption("Built with Whisper + Phi-3 (Ollama) — 100% Private & Free")
 
-# ===== Sidebar: input type
+# Sidebar:type (txt,audio)
 st.sidebar.header(" Upload Your Data")
 input_type = st.sidebar.radio("Choose input type:", ["Transcript (.txt)", "Audio (.mp3, .wav, etc)"])
 
-# ===== Initialize chat history
+# Chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = load_chat_history()
 if "selected_history" not in st.session_state:
     st.session_state.selected_history = None
 
-# ===== Sidebar: clickable compact history (answers only)
+# History show while clicking 
 st.sidebar.header(" Chat History")
 if st.session_state.chat_history:
     for i, chat in enumerate(st.session_state.chat_history):
-        short_answer = chat['answer'][:60] + ("..." if len(chat['answer']) > 5 else "")
+        short_answer = chat['answer'][:60] + ("..." if len(chat['answer']) > 60 else "")
         if st.sidebar.button(short_answer, key=f"history_{i}"):
-            st.session_state.selected_history = chat['answer']  # full answer
+            st.session_state.selected_history = chat['answer']  
 else:
     st.sidebar.info("No previous chat history.")
 
-# ===== Upload transcript
+# Show only selected history in main chat 
+if st.session_state.selected_history:
+    st.markdown("---")
+    st.subheader(" History")
+    st.markdown(st.session_state.selected_history)
+    st.markdown("---")
+
+# Upload transcript
 if input_type == "Transcript (.txt)":
     txt_file = st.sidebar.file_uploader("Upload transcript file", type=["txt"])
     if txt_file:
@@ -118,7 +130,7 @@ if input_type == "Transcript (.txt)":
         st.success(" Transcript uploaded successfully.")
         st.text_area(" Transcript Preview", value=transcript, height=300)
 
-# ===== Upload and transcribe audio
+# Upload and transcribe audio
 if input_type == "Audio (.mp3, .wav, etc)":
     audio_file = st.sidebar.file_uploader("Upload audio file", type=["mp3", "wav", "m4a", "webm"])
     if audio_file:
@@ -136,7 +148,7 @@ if input_type == "Audio (.mp3, .wav, etc)":
             except Exception as e:
                 st.warning(f"⚠️ Could not delete temporary file: {e}")
 
-# ===== Main chat area
+# Main chat area
 if "transcript" in st.session_state:
     st.markdown("---")
     st.markdown("###  Ask Questions About the Meeting")
@@ -152,7 +164,7 @@ if "transcript" in st.session_state:
         else:
             st.info("ℹ Chat history is already empty.")
 
-    # ===== Display full chat history
+    # Display full chat history
     if st.session_state.chat_history:
         for chat in st.session_state.chat_history:
             with st.container():
@@ -160,7 +172,7 @@ if "transcript" in st.session_state:
                 st.markdown(f" Assistant: {chat['answer']}")
                 st.markdown("---")
 
-    # ===== Chat input form
+    # Chat input form
     with st.form(key="chat_form", clear_on_submit=True):
         col1, col2 = st.columns([6, 1])
         with col1:
@@ -171,8 +183,8 @@ if "transcript" in st.session_state:
         if send and question.strip():
             user_input = question.strip().lower()
 
-            greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
-            if any(g in user_input for g in greetings):
+            # ✅ Improved greeting check
+            if is_strict_greeting(user_input):
                 answer = " Hello! How can I help you today?"
             else:
                 answer = ask_phi3(st.session_state["transcript"], question, st.session_state.chat_history)
@@ -184,4 +196,4 @@ if "transcript" in st.session_state:
                     "answer": answer
                 })
                 save_chat_history(st.session_state.chat_history)
-                st.rerun()  # refresh to show new message immediately
+                st.rerun()
