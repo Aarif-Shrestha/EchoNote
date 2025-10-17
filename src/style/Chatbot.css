@@ -1,0 +1,276 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #F9FAFB;
+}
+
+.navbar-section {
+  background-color: #FFFFFF;
+  margin: 0;
+  padding: 0 100px;
+  padding-left: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Logo and Name together */
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Logo Box */
+.logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 38px;
+  font-size: 20px;
+  font-weight: bold;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  color: white;
+  background-color: rgba(79, 70, 229, 1);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Logo Name */
+.logo-name {
+  font-size: 25px;
+  font-weight: 800;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  padding-right: 700px;
+}
+
+/* Nav Links */
+.nav-link {
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  padding-right: 125px;
+}
+
+.nav-link a {
+  text-decoration: none;
+  color: black;
+  font-size: 18px;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.nav-link a:hover {
+  color: blue;
+}
+
+/* Profile Icon */
+.logo2 {
+  display: flex;
+}
+
+.logo2 img {
+  width: 25px;
+  height: 25px;
+}
+
+.chatbot-section {
+  max-width: 800px;
+  margin: 40px auto;
+  text-align: left;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  padding-bottom: 17px;
+  
+}
+
+.chatbot-title {
+  font-size: 32px;
+  font-weight: bold;
+ margin-top: 5px;
+ margin-bottom: 5px;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  text-align: left;
+  
+}
+
+.chatbot-subtitle {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 0px;
+  margin-bottom: 0px;
+}
+
+/* Context Section */
+.context-section {
+  margin-bottom: 20px;
+}
+
+.context-btn {
+  background-color: #FFFFFF;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  cursor: default;
+  font-size: 17px;
+  width: 140px;
+}
+
+.context-info {
+  color: #777;
+  font-size: 14px;
+}
+
+.context-dropdown {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-weight: 500;
+  font-size: 17px;
+  width: 160px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.context-dropdown:focus {
+  outline: none;
+  border-color: #7e5eff;
+}
+
+/* Chat Window */
+.chat-window {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #FFFFFF;
+  padding: 30px;
+  text-align: left;
+  min-height: 290px;
+  margin-bottom: 15px;
+  width: 754px;
+  
+
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  padding: 12px 18px;
+  font-size: 16px;
+  word-break: break-word;
+  background: #f3f4f6;
+  color: #222;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.chat-message.bot {
+  align-self: flex-start;
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.chat-time {
+  font-size: 12px;
+  color: #888;
+  margin-top: 6px;
+  align-self: flex-end;
+}
+
+/* Input Section */
+.chat-input-section {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 130px;
+}
+
+.chat-input-section input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+}
+
+.send-btn {
+  background-color: #7e5eff;
+  border: none;
+  padding-left: 20px;
+  padding-right: 20px;
+  height: 40px;
+  width: 82px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: white;
+  font-weight: 500;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  font-size: 17px;  
+}
+
+.send-btn:hover {
+  background-color: #4406ff;
+}
+
+/* Suggested Questions */
+.suggested-questions {
+  margin-top: 20px;
+  text-align: left;
+  padding-top: 1px;
+  
+}
+
+.suggested-questions p {
+  font-size: 17px;
+  color: #555;
+  margin-bottom: 8px;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+.question-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 5px;
+}
+
+.question-tags span {
+  background: #F3F4F6;
+  height: 25px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  
+  font-size: 16px;
+  cursor: pointer;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  background: #FFFFFF;
+  
+}
+
+.footer p{
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  font-size: 16px;
+}
