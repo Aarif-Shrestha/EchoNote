@@ -9,8 +9,27 @@ import json
 import jwt
 import datetime
 import hashlib
+
+# Add ffmpeg to PATH for Whisper (Windows fix)
+ffmpeg_paths = [
+    r"C:\ffmpeg\bin",
+    os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0-full_build\bin"),
+    r"C:\ProgramData\chocolatey\bin",
+    os.path.expanduser(r"~\scoop\shims")
+]
+for ffmpeg_path in ffmpeg_paths:
+    if os.path.exists(ffmpeg_path) and ffmpeg_path not in os.environ["PATH"]:
+        os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
+        print(f"✅ Added {ffmpeg_path} to PATH")
+        break
 from asr_model import ASRTranscriber
 from chatbot import is_strict_greeting, ask_ollama, get_greeting_response
+from meetingbaas_integration import create_meeting_bot, get_bot_status, get_transcript
+from dotenv import load_dotenv
+from auto_fetch import start_auto_fetch
+
+# Load environment variables
+load_dotenv()
 
 # Path to React build folder
 REACT_BUILD_DIR = os.path.join(os.path.dirname(__file__), 'dist')
@@ -20,14 +39,15 @@ USERS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'users.json')
 AUDIOS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'audios.json')
 TRANSCRIPTS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'transcripts.json')
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'baseline_asr_model.pth')
+# Note: Whisper loads its own model, no custom path needed
 
 # Allowed audio file extensions
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'webm'}
 
 # JWT Secret Key (change this to a random secret key in production)
-SECRET_KEY = 'your-secret-key-change-this-in-production'
+SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
+# Initialize Flask app
 app = Flask(__name__, static_folder=REACT_BUILD_DIR, static_url_path='/')
 app.config['SECRET_KEY'] = SECRET_KEY
 CORS(app)
@@ -43,10 +63,12 @@ def get_transcriber():
     global transcriber
     if transcriber is None:
         try:
-            print("🔄 Loading ASR model...")
-            transcriber = ASRTranscriber(MODEL_PATH)
+            print("🔄 Loading Whisper ASR model...")
+            transcriber = ASRTranscriber()  # Whisper loads its own model
         except Exception as e:
             print(f"❌ Failed to load ASR model: {str(e)}")
+            import traceback
+            traceback.print_exc()
             transcriber = None
     return transcriber
 
@@ -347,16 +369,21 @@ def upload_audio(current_user_id, current_username):
     transcript = "Transcript generation in progress..."
     try:
         asr = get_transcriber()
-        if asr and asr.model:
+        print(f"🔍 ASR instance: {asr}")
+        if asr:
+            print(f"🔍 ASR model loaded: {asr.asr_model is not None}")
+        if asr and asr.asr_model:
             print(f"🎤 Transcribing audio for user {current_username}...")
             transcript = asr.transcribe(file_path)
-            print(f"✅ Transcription complete!")
+            print(f"✅ Transcription complete! Length: {len(transcript)}")
         else:
             transcript = "Transcription service unavailable. Model not loaded."
             print("⚠️ ASR model not available")
     except Exception as e:
         transcript = f"Error during transcription: {str(e)}"
         print(f"❌ Transcription error: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     # Save transcript with username for easy identification
     transcripts = load_transcripts()
@@ -505,6 +532,212 @@ def chat_with_ollama(current_user_id, current_username):
     return jsonify(response), 200
 
 
+# ============= RECALL.AI MEETING BOT ENDPOINTS =============
+
+# Storage for bot_id to user mapping
+BOT_MEETINGS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'bot_meetings.json')
+
+def load_bot_meetings():
+    """Load bot meetings mapping"""
+    if os.path.exists(BOT_MEETINGS_FILE):
+        try:
+            with open(BOT_MEETINGS_FILE, 'r') as f:
+                content = f.read().strip()
+                if content:
+                    return json.loads(content)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return {}
+
+def save_bot_meetings(bot_meetings):
+    """Save bot meetings mapping"""
+    with open(BOT_MEETINGS_FILE, 'w') as f:
+        json.dump(bot_meetings, f, indent=2)
+
+
+@app.route('/api/record_meeting', methods=['POST'])
+@token_required
+def record_meeting(current_user_id, current_username):
+    """Start MeetingBaas bot to join and record a meeting"""
+    data = request.get_json()
+    meeting_url = data.get('meeting_url', '').strip()
+    meeting_name = data.get('meeting_name', 'Recorded Meeting')
+    
+    if not meeting_url:
+        return jsonify({'error': 'Meeting URL is required'}), 400
+    
+    # Validate meeting URL format
+    if not any(platform in meeting_url.lower() for platform in ['zoom.us', 'meet.google.com', 'teams.microsoft.com']):
+        return jsonify({'error': 'Invalid meeting URL. Must be Zoom, Google Meet, or Microsoft Teams'}), 400
+    
+    # Create MeetingBaas bot
+    result = create_meeting_bot(meeting_url, meeting_name="Echo Note Bot")
+    
+    if not result['success']:
+        return jsonify({'error': result.get('message', 'Failed to create bot')}), 500
+    
+    # Store bot_id with user info
+    bot_meetings = load_bot_meetings()
+    bot_id = result['bot_id']
+    bot_meetings[bot_id] = {
+        'user_id': current_user_id,
+        'username': current_username,
+        'meeting_name': meeting_name,
+        'meeting_url': meeting_url,
+        'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+    save_bot_meetings(bot_meetings)
+    
+    return jsonify({
+        'message': result['message'],
+        'bot_id': bot_id,
+        'meeting_name': meeting_name
+    }), 200
+
+
+@app.route('/api/bot_status/<bot_id>', methods=['GET'])
+@token_required
+def bot_status(current_user_id, current_username, bot_id):
+    """Get status of a MeetingBaas bot"""
+    # Verify this bot belongs to the current user
+    bot_meetings = load_bot_meetings()
+    bot_info = bot_meetings.get(bot_id)
+    
+    if not bot_info or bot_info['user_id'] != current_user_id:
+        return jsonify({'error': 'Bot not found or access denied'}), 404
+    
+    # Get bot status from MeetingBaas
+    result = get_bot_status(bot_id)
+    
+    if not result['success']:
+        return jsonify({'error': 'Failed to get bot status'}), 500
+    
+    return jsonify({
+        'bot_id': bot_id,
+        'status': result['status'],
+        'meeting_name': bot_info['meeting_name']
+    }), 200
+
+
+@app.route('/api/meetingbaas/webhook', methods=['POST'])
+def meetingbaas_webhook():
+    """
+    Webhook endpoint for MeetingBaas to send bot status updates
+    This endpoint does NOT require authentication (webhooks come from MeetingBaas)
+    """
+    try:
+        data = request.get_json()
+        print(f"\n{'='*60}")
+        print(f"📨 MeetingBaas Webhook Received!")
+        print(f"{'='*60}")
+        print(f"Data: {json.dumps(data, indent=2)}")
+        
+        # Extract bot information
+        bot_id = data.get('bot_id') or data.get('id')
+        status = data.get('status')
+        event_type = data.get('event') or data.get('event_type')
+        
+        print(f"\n🤖 Bot ID: {bot_id}")
+        print(f"📊 Status: {status}")
+        print(f"🎯 Event: {event_type}")
+        
+        # If bot recording is done, fetch and save transcript
+        if status in ['done', 'completed', 'finished'] or event_type in ['bot.completed', 'recording.completed']:
+            print(f"\n✅ Bot recording completed! Fetching transcript...")
+            
+            # Find which user this bot belongs to
+            bot_meetings = load_bot_meetings()
+            bot_info = bot_meetings.get(bot_id)
+            
+            if bot_info:
+                user_id = bot_info['user_id']
+                
+                # Get transcript from MeetingBaas
+                transcript_result = get_transcript(bot_id)
+                
+                if transcript_result['success']:
+                    # Save transcript
+                    transcripts = load_transcripts()
+                    
+                    if user_id not in transcripts:
+                        transcripts[user_id] = {}
+                    
+                    transcripts[user_id][bot_id] = {
+                        'transcript': transcript_result['transcript'],
+                        'meeting_name': bot_info['meeting_name'],
+                        'created_at': datetime.datetime.now().isoformat(),
+                        'source': 'meetingbaas_webhook',
+                        'speakers': transcript_result.get('speakers', [])
+                    }
+                    
+                    save_transcripts(transcripts)
+                    
+                    print(f"✅ Transcript saved successfully!")
+                    print(f"   User: {user_id}")
+                    print(f"   Speakers: {', '.join(transcript_result.get('speakers', []))}")
+                else:
+                    print(f"❌ Failed to get transcript: {transcript_result.get('message')}")
+            else:
+                print(f"⚠️ Bot ID not found in bot_meetings.json")
+        
+        print(f"{'='*60}\n")
+        
+        # Always return 200 OK to acknowledge webhook receipt
+        return jsonify({'success': True, 'message': 'Webhook received'}), 200
+        
+    except Exception as e:
+        print(f"❌ Webhook error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Still return 200 to prevent webhook retries
+        return jsonify({'success': False, 'error': str(e)}), 200
+
+
+@app.route('/api/fetch_transcript/<bot_id>', methods=['POST'])
+@token_required
+def fetch_transcript_manual(current_user_id, current_username, bot_id):
+    """Manually fetch and save transcript from MeetingBaas (for when webhooks fail)"""
+    # Verify this bot belongs to the current user
+    bot_meetings = load_bot_meetings()
+    bot_info = bot_meetings.get(bot_id)
+    
+    if not bot_info or bot_info['user_id'] != current_user_id:
+        return jsonify({'error': 'Bot not found or access denied'}), 404
+    
+    # Get transcript from MeetingBaas
+    result = get_transcript(bot_id)
+    
+    if not result['success']:
+        return jsonify({'error': result.get('message', 'Failed to get transcript')}), 500
+    
+    # Save transcript to transcripts.json
+    transcripts = load_transcripts()
+    
+    if current_user_id not in transcripts:
+        transcripts[current_user_id] = {}
+    
+    transcripts[current_user_id][bot_id] = {
+        'transcript': result['transcript'],
+        'meeting_name': bot_info['meeting_name'],
+        'created_at': datetime.datetime.now().isoformat(),
+        'source': 'meetingbaas_manual',
+        'speakers': result.get('speakers', [])
+    }
+    
+    save_transcripts(transcripts)
+    
+    return jsonify({
+        'success': True,
+        'bot_id': bot_id,
+        'transcript': result['transcript'],
+        'speakers': result.get('speakers', []),
+        'message': 'Transcript fetched and saved successfully'
+    }), 200
+
+
+# ============= END MEETINGBAAS ENDPOINTS =============
+
+
 # Serve React static files and index.html for frontend routes
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -519,4 +752,8 @@ def serve_react(path):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Start automatic transcript fetcher (polls every 30 seconds)
+    start_auto_fetch()
+    
+    # Run with debug but disable reloader to prevent restart issues with model loading
+    app.run(debug=True, use_reloader=False)

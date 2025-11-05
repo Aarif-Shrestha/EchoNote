@@ -1,6 +1,13 @@
 """
 Ollama Chatbot Integration for Echo Note
 Handles meeting transcript Q&A using Ollama's Gemma 2B model
+
+PERFORMANCE OPTIMIZATIONS:
+- Smart context extraction (6000 chars max, sampling for summaries)
+- Ultra-short prompts for faster processing
+- Quick answers for simple queries (skip AI)
+- 120s timeout for long transcripts
+- Efficient Q&A format
 """
 
 import subprocess
@@ -64,58 +71,76 @@ def ask_ollama(transcript, question, chat_history=None, model_name="gemma:2b"):
             'error': f"Model '{model_name}' not found in Ollama. Please run: ollama pull {model_name}"
         }
     
+    # Save original transcript for "show transcript" command
+    original_transcript = transcript
+    question_lower = question.lower()
+    
+    print(f"🔍 Question received: '{question}'")
+    print(f"📄 Original transcript length: {len(original_transcript)} chars")
+    
+    # Quick answers for simple queries (skip AI processing) - BEFORE truncation
+    # Check if user is asking to see the full transcript
+    show_transcript_keywords = ["show transcript", "display transcript", "show me the transcript", 
+                                "display the transcript", "view transcript", "see transcript",
+                                "full transcript", "entire transcript", "whole transcript",
+                                "read transcript", "give me transcript", "get transcript",
+                                "transcript please", "show full"]
+    if any(keyword in question_lower for keyword in show_transcript_keywords):
+        print(f"✅ Quick answer: Returning full transcript ({len(original_transcript)} chars)")
+        return {'answer': f"Here is the full meeting transcript:\n\n{original_transcript}"}
+    
+    # Quick answer for "who attended" or "who was there"
+    if any(phrase in question_lower for phrase in ["who attended", "who was there", "who spoke", "list of speakers"]):
+        # Extract speaker numbers from transcript
+        import re
+        speakers = re.findall(r'Speaker (\d+):', original_transcript)
+        if speakers:
+            unique_speakers = sorted(set(speakers))
+            return {'answer': f"There were {len(unique_speakers)} speakers in this meeting: Speaker {', Speaker '.join(unique_speakers)}."}
+    
+    # Now do smart context extraction for AI processing
+    MAX_TRANSCRIPT_LENGTH = 6000  # Reduced for faster processing
+    original_length = len(transcript)
+    
+    # For summaries, use more context; for specific questions, less is fine
+    is_summary = any(word in question_lower for word in ["summary", "summarize", "summarise", "overview"])
+    
+    if is_summary:
+        # For summaries, take beginning, middle, and end
+        if len(transcript) > MAX_TRANSCRIPT_LENGTH:
+            third = MAX_TRANSCRIPT_LENGTH // 3
+            beginning = transcript[:third]
+            middle_start = len(transcript) // 2 - third // 2
+            middle = transcript[middle_start:middle_start + third]
+            end = transcript[-third:]
+            transcript = beginning + "\n[...]\n" + middle + "\n[...]\n" + end
+            print(f"📝 Using smart sampling: {original_length} → {len(transcript)} chars")
+    else:
+        # For specific questions, just use first part (most relevant info usually at start)
+        if len(transcript) > MAX_TRANSCRIPT_LENGTH:
+            transcript = transcript[:MAX_TRANSCRIPT_LENGTH]
+            print(f"📝 Truncated to {MAX_TRANSCRIPT_LENGTH} chars for faster processing")
+    
     # Build conversational context from history
     history_context = ""
     if chat_history:
         for chat in chat_history:
             history_context += f"User: {chat['question']}\nAssistant: {chat['answer']}\n\n"
     
-    # Check if user is asking to see the full transcript
-    show_transcript_keywords = ["show transcript", "display transcript", "show me the transcript", 
-                                "display the transcript", "view transcript", "see transcript",
-                                "full transcript", "entire transcript", "whole transcript"]
-    is_show_transcript = any(keyword in question.lower() for keyword in show_transcript_keywords)
-    
-    if is_show_transcript:
-        return {'answer': f"Here is the full meeting transcript:\n\n{transcript}"}
-    
-    # Check if user is asking for a summary
-    is_summary = any(word in question.lower() for word in ["summary", "summarize", "summarise", "overview"])
-    
-    # Build prompt based on question type
+    # Build ultra-efficient prompts
     if is_summary:
-        prompt = f"""You are analyzing a meeting transcript. Here is the transcript:
+        # Minimal prompt for summary
+        prompt = f"""Transcript: {transcript}
 
---- BEGIN TRANSCRIPT ---
-{transcript}
---- END TRANSCRIPT ---
-
-Your task: Write a comprehensive summary of this meeting transcript in 2-3 well-structured paragraphs. Include the main topics discussed, key decisions made, and important action items.
-
-CRITICAL FORMATTING RULES:
-- Write ONLY in paragraph format
-- DO NOT use bullet points (*, -, •)
-- DO NOT use numbered lists (1., 2., 3.)
-- DO NOT use asterisks or dashes for lists
-- Write complete sentences in flowing paragraphs
-- Keep it between 150-200 words
-
-Example format:
-"The meeting focused on several important topics. First, the team discussed... Sarah proposed... John raised concerns... The group agreed to... Next, the product launch... Finally, regarding hiring..."
-
-Remember: PARAGRAPH FORMAT ONLY. NO BULLET POINTS OR LISTS OF ANY KIND."""
-        system_msg = "You are a professional meeting summarizer. You MUST write in paragraph format only. Never use bullet points, asterisks, dashes, or any list formatting. Write flowing narrative text."
+Task: Write a 150-word paragraph summary covering: main topics, decisions, action items."""
+        system_msg = "Be concise. Paragraph format only."
     else:
-        prompt = f"""You are analyzing a meeting transcript. Here is the transcript:
+        # Ultra-short prompt for Q&A
+        prompt = f"""Transcript: {transcript}
 
---- BEGIN TRANSCRIPT ---
-{transcript}
---- END TRANSCRIPT ---
-
-User's question: {question}
-
-Your task: Answer the user's question based ONLY on the information in the transcript above. If the transcript doesn't contain the answer, say "This information is not mentioned in the transcript." Keep your answer to 1-2 sentences maximum."""
-        system_msg = "You are a meeting assistant. Answer questions based strictly on the provided transcript. Be concise and direct."
+Q: {question}
+A:"""
+        system_msg = "Answer in 1-2 sentences based on transcript only."
     
     try:
         # Call Ollama via subprocess
@@ -125,7 +150,8 @@ Your task: Answer the user's question based ONLY on the information in the trans
         ]
         
         print(f"🤖 Calling Ollama model: {model_name}")
-        result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        # Increase timeout for long transcripts (120 seconds)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=120)
         
         if result.returncode == 0:
             answer = result.stdout.strip()

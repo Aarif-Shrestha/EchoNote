@@ -1,132 +1,147 @@
 """
-ASR Model for Audio Transcription
-Based on Baseline ASR with LSTM and CTC
+Echo Note: Whisper + Speaker Diarization Model
 """
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import librosa
 import numpy as np
-import os
+import whisper
+
+# Try to import speaker diarization - make it optional
+try:
+    from speechbrain.pretrained import EncoderClassifier
+    from sklearn.cluster import AgglomerativeClustering
+    DIARIZATION_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️ Speaker diarization not available: {e}")
+    DIARIZATION_AVAILABLE = False
 
 # ------------------- CONFIG -------------------
 SAMPLE_RATE = 16000
-N_MFCC = 13
-
-# ------------------- MFCC EXTRACTION -------------------
-def extract_mfcc(audio_path, n_mfcc=N_MFCC, sr=SAMPLE_RATE):
-    """Extract MFCC features from audio file"""
-    audio, sr = librosa.load(audio_path, sr=sr)
-    mfccs = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
-    return mfccs.astype(np.float32)
-
-# ------------------- TOKENIZER -------------------
-class CharTokenizer:
-    def __init__(self):
-        self.char_map = {c: i + 1 for i, c in enumerate(" abcdefghijklmnopqrstuvwxyz'.")}
-        self.idx_map = {i + 1: c for i, c in enumerate(" abcdefghijklmnopqrstuvwxyz'.")}
-        self.blank_id = 0
-
-    def decode(self, indices):
-        """Decode indices to text using CTC decoding"""
-        output = []
-        for i, idx in enumerate(indices):
-            if idx != self.blank_id and (i == 0 or idx != indices[i - 1]):
-                output.append(self.idx_map.get(idx, ''))
-        return "".join(output)
-
-# ------------------- MODEL DEFINITION -------------------
-class BaselineASR(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_layers=3, dropout=0.1):
-        super(BaselineASR, self).__init__()
-        self.lstm = nn.LSTM(
-            input_size=input_dim,
-            hidden_size=hidden_dim,
-            num_layers=n_layers,
-            dropout=dropout,
-            bidirectional=True,
-            batch_first=True
-        )
-        self.fc = nn.Linear(hidden_dim * 2, output_dim)
-
-    def forward(self, x):
-        output, _ = self.lstm(x)
-        return self.fc(output)
 
 # ------------------- TRANSCRIPTION CLASS -------------------
 class ASRTranscriber:
-    def __init__(self, model_path, device=None):
-        self.model_path = model_path
+    def __init__(self, model_path=None, device=None):
+        """
+        Initialize Whisper + Speaker Diarization
+        Note: model_path is kept for compatibility but Whisper loads its own models
+        """
         self.device = device if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = CharTokenizer()
-        self.model = None
-        self.INPUT_DIM = N_MFCC
-        self.HIDDEN_DIM = 256
-        self.OUTPUT_DIM = len(self.tokenizer.char_map) + 1
+        self.asr_model = None
+        self.classifier = None
         
         self.load_model()
     
     def load_model(self):
-        """Load the pre-trained ASR model"""
+        """Load Whisper and Speaker Diarization models"""
         try:
-            if not os.path.exists(self.model_path):
-                print(f"⚠️ Model not found at {self.model_path}")
-                return False
+            print("Loading Whisper model...")
+            self.asr_model = whisper.load_model("base")
+            print("✅ Whisper model loaded.\n")
             
-            # Initialize model
-            self.model = BaselineASR(
-                self.INPUT_DIM, 
-                self.HIDDEN_DIM, 
-                self.OUTPUT_DIM
-            ).to(self.device)
+            # Load speaker classifier only if diarization is available
+            if DIARIZATION_AVAILABLE:
+                try:
+                    print("Loading speaker diarization model...")
+                    self.classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb")
+                    print("✅ Speaker diarization model loaded.\n")
+                except Exception as e:
+                    print(f"⚠️ Speaker diarization unavailable: {e}")
+                    self.classifier = None
+            else:
+                self.classifier = None
+                print("⚠️ Running without speaker diarization.\n")
             
-            # Load state dict
-            state_dict = torch.load(self.model_path, map_location=self.device, weights_only=True)
-            self.model.load_state_dict(state_dict)
-            self.model.eval()
-            
-            print(f"✅ ASR Model loaded successfully from {self.model_path}")
             return True
             
         except Exception as e:
-            print(f"❌ Error loading model: {str(e)}")
-            self.model = None
+            print(f"❌ Error loading models: {str(e)}")
+            self.asr_model = None
+            self.classifier = None
             return False
     
     def transcribe(self, audio_path):
-        """Transcribe audio file to text"""
+        """Transcribe audio file with speaker diarization"""
         try:
-            if self.model is None:
-                return "Error: Model not loaded. Please check model file."
+            if self.asr_model is None:
+                return "Error: Whisper model not loaded. Please check installation."
             
-            # Extract MFCC features
-            mfcc_features = extract_mfcc(audio_path)
+            # --- Load Audio ---
+            y, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+            print(f"✅ Loaded {audio_path} ({len(y)/sr:.2f}s)\n")
             
-            # Convert to tensor
-            features = torch.from_numpy(mfcc_features).unsqueeze(0).to(self.device)
+            # --- Transcribe ---
+            print("🔹 Transcribing with Whisper...")
+            result = self.asr_model.transcribe(audio_path, verbose=False)
+            segments = result["segments"]
+            text = result["text"]
+            print("\n📝 Transcript:")
+            print(text)
             
-            # Transpose if needed (ensure time dimension is correct)
-            if features.dim() == 3 and features.shape[1] < features.shape[2]:
-                features = features.transpose(1, 2)
+            # If no segments or no classifier, return plain text
+            if not segments or self.classifier is None:
+                if self.classifier is None:
+                    print("⚠️ Speaker diarization unavailable, returning plain transcript.\n")
+                return text if text else "Unable to transcribe audio."
             
-            # Run inference
-            with torch.no_grad():
-                logits = self.model(features)
+            # --- Speaker Embeddings ---
+            embeddings, valid_segments = [], []
+            print("\n🔹 Extracting speaker embeddings...")
+            for s in segments:
+                start, end = int(s["start"]*sr), int(s["end"]*sr)
+                chunk = y[start:end]
+                if len(chunk)/sr < 1.0: 
+                    continue
+                wav_tensor = torch.tensor(chunk, dtype=torch.float32).unsqueeze(0)
+                with torch.no_grad():
+                    emb = self.classifier.encode_batch(wav_tensor).squeeze().cpu().numpy()
+                    emb /= np.linalg.norm(emb) + 1e-8
+                embeddings.append(emb)
+                valid_segments.append(s)
             
-            # Decode predictions
-            predictions = F.log_softmax(logits, dim=-1).argmax(dim=-1).squeeze(0).tolist()
-            transcript = self.tokenizer.decode(predictions)
+            if not embeddings:
+                print("❌ No valid segments for diarization.")
+                return text
             
-            # Clean up transcript
-            transcript = transcript.strip()
-            if transcript:
-                # Capitalize first letter
-                transcript = transcript[0].upper() + transcript[1:] if len(transcript) > 1 else transcript.upper()
-                # Add period if missing
-                if not transcript.endswith(('.', '!', '?')):
-                    transcript += '.'
+            embeddings = np.stack(embeddings)
+            print(f"✅ Extracted {len(embeddings)} embeddings.\n")
             
-            return transcript if transcript else "Unable to transcribe audio."
+            # --- Cluster Speakers ---
+            print("🔹 Clustering speakers...")
+            n_speakers = min(4, len(embeddings))
+            clustering = AgglomerativeClustering(n_clusters=n_speakers, metric='cosine', linkage='average')
+            labels = clustering.fit_predict(embeddings)
+            print(f"✅ Diarization complete! Detected {len(set(labels))} speakers.\n")
+            
+            # --- Format Final Diarized Transcript (merge same speakers) ---
+            output_lines = []
+            
+            current_speaker = None
+            current_text = ""
+            
+            for i, seg in enumerate(valid_segments):
+                speaker_id = labels[i] + 1
+                text = seg['text'].strip()
+                
+                if current_speaker == speaker_id:
+                    # Same speaker continues, append text
+                    current_text += " " + text
+                else:
+                    # New speaker, write previous speaker's paragraph
+                    if current_speaker is not None:
+                        output_lines.append(f"Speaker {current_speaker}: {current_text.strip()}\n")
+                    
+                    # Start new speaker paragraph
+                    current_speaker = speaker_id
+                    current_text = text
+            
+            # Write the last speaker's paragraph
+            if current_speaker is not None:
+                output_lines.append(f"Speaker {current_speaker}: {current_text.strip()}\n")
+            
+            # Add summary footer
+            output_lines.append(f"\n[Total Speakers: {len(set(labels))}]")
+            
+            return "\n".join(output_lines)
             
         except Exception as e:
             print(f"❌ Transcription error: {str(e)}")
