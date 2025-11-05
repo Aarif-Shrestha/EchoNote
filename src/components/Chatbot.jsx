@@ -74,6 +74,53 @@ const Chatbot = () => {
     }
   }, [selectedMeeting]);
 
+  // Show full transcript in chat as a bot message (verbatim)
+  const handleShowTranscript = (e) => {
+    if (!handleProtectedAction(e)) return;
+    if (!selectedTranscript) return;
+    const paragraphs = splitIntoSpeakerParagraphs(selectedTranscript);
+    const newMessages = paragraphs.map(p => ({
+      sender: 'bot',
+      text: p,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+    setMessages(prev => [...prev, ...newMessages]);
+    // hide suggestions after showing transcript
+    hideSuggestions();
+  };
+
+  // Return true if the question is a transcript request (including common misspellings)
+  const isTranscriptQuery = (q) => {
+    if (!q) return false;
+    const qLower = q.trim().toLowerCase();
+    const triggers = [
+      "show transcript", "display transcript", "show me the transcript",
+      "display the transcript", "view transcript", "see transcript",
+      "full transcript", "entire transcript", "whole transcript",
+      "read transcript", "give me transcript", "get transcript",
+      "transcript please", "show full", "transcript", "trans", "show trans"
+    ];
+    const misspellings = ["transciot", "transcipt", "transcipt", "transciipt", "transciot"];
+    return triggers.some(t => qLower.includes(t)) || misspellings.some(m => qLower.includes(m)) || qLower === 'transcript' || qLower === 'trans';
+  }
+
+  // Split transcript into speaker paragraphs. It attempts to split before speaker labels like "Speaker 2:" or "Name:"
+  const splitIntoSpeakerParagraphs = (text) => {
+    if (!text) return [];
+    // Normalize newlines
+    const norm = text.replace(/\r\n/g, '\n').trim();
+    // Split before occurrences of 'Speaker X:' or any 'Name:' pattern
+    const parts = norm.split(/(?=(?:Speaker\s*\d+:)|(?:[A-Za-z][A-Za-z0-9 .'-]+:))/g)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+    // If splitting produced only one long block, fallback to splitting on double newlines
+    if (parts.length <= 1) {
+      return norm.split(/\n{2,}/).map(p => p.replace(/\n+/g, ' ').trim()).filter(Boolean);
+    }
+    // Clean up internal newlines inside each part
+    return parts.map(p => p.replace(/\n+/g, ' ').trim());
+  }
+
   const fetchTranscript = async (meetingId) => {
     try {
       const token = localStorage.getItem('token');
@@ -148,6 +195,28 @@ const Chatbot = () => {
       return "Please select a meeting from the dropdown above to start asking questions.";
     }
 
+    // Client-side quick handling: if user asks for the transcript (or typoed variants),
+    // immediately return the verbatim transcript without calling the backend model.
+    const qLower = question.trim().toLowerCase();
+    const transcriptTriggers = [
+      "show transcript", "display transcript", "show me the transcript",
+      "display the transcript", "view transcript", "see transcript",
+      "full transcript", "entire transcript", "whole transcript",
+      "read transcript", "give me transcript", "get transcript",
+      "transcript please", "show full", "transcript", "trans", "show trans"
+    ];
+    const misspellings = ["transciot", "transcipt", "transcipt", "transciipt", "transciot"];
+
+    if (
+      transcriptTriggers.some(t => qLower.includes(t)) ||
+      misspellings.some(m => qLower.includes(m)) ||
+      qLower === "transcript" || qLower === "trans"
+    ) {
+      // Return the selected transcript directly (no extra prefix)
+      // Collapse newlines so it appears as one line in chat
+      return selectedTranscript.replace(/\n+/g, ' ');
+    }
+
     setIsLoading(true);
 
     try {
@@ -220,14 +289,25 @@ const Chatbot = () => {
     
     // Get Ollama response
     const answer = await askOllama(question);
-    
+
     if (answer) {
-      const botMessage = {
-        sender: "bot",
-        text: answer,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prevMessages => [...prevMessages, botMessage]);
+      if (isTranscriptQuery(question)) {
+        // Split transcript into paragraphs and insert each as its own bot message
+        const paragraphs = splitIntoSpeakerParagraphs(answer);
+        const newMessages = paragraphs.map(p => ({
+          sender: 'bot',
+          text: p,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
+        setMessages(prev => [...prev, ...newMessages]);
+      } else {
+        const botMessage = {
+          sender: "bot",
+          text: answer,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prevMessages => [...prevMessages, botMessage]);
+      }
     }
   };
 
@@ -248,14 +328,24 @@ const Chatbot = () => {
     
     // Get Ollama response
     const answer = await askOllama(question);
-    
+
     if (answer) {
-      const botMessage = {
-        sender: "bot",
-        text: answer,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prevMessages => [...prevMessages, botMessage]);
+      if (isTranscriptQuery(question)) {
+        const paragraphs = splitIntoSpeakerParagraphs(answer);
+        const newMessages = paragraphs.map(p => ({
+          sender: 'bot',
+          text: p,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
+        setMessages(prev => [...prev, ...newMessages]);
+      } else {
+        const botMessage = {
+          sender: "bot",
+          text: answer,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prevMessages => [...prevMessages, botMessage]);
+      }
     }
   };
 
@@ -291,6 +381,12 @@ const Chatbot = () => {
         ? `Currently analyzing: ${meetings.find(m => m.meeting_id === selectedMeeting)?.meeting_name}`
         : "No meeting selected"}
     </p>
+    {/* Button to show the full transcript verbatim in the chat */}
+    <div style={{marginTop: '8px'}}>
+      <button className="show-transcript-btn" onClick={handleShowTranscript} disabled={!selectedTranscript}>
+        Show full transcript
+      </button>
+    </div>
   </div>
 
   

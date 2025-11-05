@@ -7,3 +7,13 @@ librosa==0.10.1
 numpy==1.24.3
 python-dotenv==1.1.0
 requests==2.31.0
+
+# Additional dependencies used by the project
+# Whisper ASR (OpenAI Whisper)
+openai-whisper
+# Optional speaker diarization / audio models
+speechbrain
+# Scikit-learn for clustering (used if available)
+scikit-learn
+# PySoundFile required by librosa for some audio backends
+soundfile

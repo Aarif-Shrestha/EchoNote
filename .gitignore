@@ -40,7 +40,11 @@ Thumbs.db
 desktop.ini
 
 # Models (if too large for GitHub)
-# models/*.pth
+models/*.pth
+models/*.pt
+models/*.bin
+models/*.ckpt
+models/*.safetensors
 
 # Build artifacts
 *.pyc

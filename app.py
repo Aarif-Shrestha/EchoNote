@@ -107,9 +107,10 @@ def load_users():
 
 
 def save_users(users):
-    """Save users to JSON file"""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+    """Save users to JSON file. Ensure data directory exists before writing."""
+    os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, indent=2, ensure_ascii=False)
 
 
 def load_audios():
@@ -126,9 +127,10 @@ def load_audios():
 
 
 def save_audios(audios):
-    """Save audio metadata to JSON file"""
-    with open(AUDIOS_FILE, 'w') as f:
-        json.dump(audios, f, indent=2)
+    """Save audio metadata to JSON file. Ensure data directory exists before writing."""
+    os.makedirs(os.path.dirname(AUDIOS_FILE), exist_ok=True)
+    with open(AUDIOS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(audios, f, indent=2, ensure_ascii=False)
 
 
 def load_transcripts():
@@ -145,9 +147,10 @@ def load_transcripts():
 
 
 def save_transcripts(transcripts):
-    """Save transcripts to JSON file"""
-    with open(TRANSCRIPTS_FILE, 'w') as f:
-        json.dump(transcripts, f, indent=2)
+    """Save transcripts to JSON file. Ensure data directory exists before writing."""
+    os.makedirs(os.path.dirname(TRANSCRIPTS_FILE), exist_ok=True)
+    with open(TRANSCRIPTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(transcripts, f, indent=2, ensure_ascii=False)
 
 
 def allowed_file(filename):
@@ -230,48 +233,64 @@ def signup():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    
-    # Validate input
-    if not username or not password:
-        return jsonify({'error': 'Username and password required'}), 400
-    
-    # Load users
-    users = load_users()
-    
-    # Check if username exists
-    if username not in users:
-        return jsonify({'error': 'Username does not exist'}), 404
-    
-    user = users[username]
-    
-    # Check password
-    if not check_password_hash(user['password_hash'], password):
-        return jsonify({'error': 'Wrong password'}), 401
-    
-    # Load user's audio files
-    audios = load_audios()
-    user_audios = audios.get(user['id'], {})
-    
-    # Generate JWT token (expires in 24 hours)
-    token = jwt.encode({
-        'user_id': user['id'],
-        'username': user['username'],
-        'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
-    }, app.config['SECRET_KEY'], algorithm='HS256')
-    
-    return jsonify({
-        'message': 'Login successful',
-        'token': token,
-        'user': {
-            'id': user['id'],
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        # Validate input
+        if not username or not password:
+            return jsonify({'error': 'Username and password required'}), 400
+        
+        # Load users
+        users = load_users()
+        
+        # Check if username exists
+        if username not in users:
+            return jsonify({'error': 'Username does not exist'}), 404
+        
+        user = users[username]
+        
+        # Check password
+        if not check_password_hash(user['password_hash'], password):
+            return jsonify({'error': 'Wrong password'}), 401
+        
+        # Load user's audio files
+        audios = load_audios()
+        user_audios = audios.get(user['id'], {})
+        
+        # Generate JWT token (expires in 24 hours)
+        token = jwt.encode({
+            'user_id': user['id'],
             'username': user['username'],
-            'audio_files': user_audios
-        },
-        'redirect': '/home'  # Frontend should redirect to home page
-    }), 200
+            'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
+        }, app.config['SECRET_KEY'], algorithm='HS256')
+
+        # PyJWT v1 returned bytes; ensure token is a string
+        if isinstance(token, bytes):
+            try:
+                token = token.decode('utf-8')
+            except Exception:
+                # fallback: convert to str
+                token = str(token)
+
+        return jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'audio_files': user_audios
+            },
+            'redirect': '/home'  # Frontend should redirect to home page
+        }), 200
+
+    except Exception as e:
+        # Log stacktrace server-side and return a JSON error so frontend doesn't show a generic "Network error"
+        print(f"❌ Login error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 
 @app.route('/api/verify_token', methods=['GET'])
@@ -550,9 +569,10 @@ def load_bot_meetings():
     return {}
 
 def save_bot_meetings(bot_meetings):
-    """Save bot meetings mapping"""
-    with open(BOT_MEETINGS_FILE, 'w') as f:
-        json.dump(bot_meetings, f, indent=2)
+    """Save bot meetings mapping. Ensure data directory exists before writing."""
+    os.makedirs(os.path.dirname(BOT_MEETINGS_FILE), exist_ok=True)
+    with open(BOT_MEETINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(bot_meetings, f, indent=2, ensure_ascii=False)
 
 
 @app.route('/api/record_meeting', methods=['POST'])

@@ -1,0 +1,7 @@
+"""
+Keep the `models/` directory in git without committing large model files.
+Place your downloaded model files (for example `whisper_base.pth`) in this folder locally.
+This file is intentionally empty and tracked so the folder exists in new clones.
+"""
+
+# intentionally empty

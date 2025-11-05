@@ -80,14 +80,39 @@ def ask_ollama(transcript, question, chat_history=None, model_name="gemma:2b"):
     
     # Quick answers for simple queries (skip AI processing) - BEFORE truncation
     # Check if user is asking to see the full transcript
-    show_transcript_keywords = ["show transcript", "display transcript", "show me the transcript", 
-                                "display the transcript", "view transcript", "see transcript",
-                                "full transcript", "entire transcript", "whole transcript",
-                                "read transcript", "give me transcript", "get transcript",
-                                "transcript please", "show full"]
+    # Robust detection for requests to show the full transcript.
+    # Include common phrasings and frequent misspellings so short/typoed user inputs still trigger this.
+    show_transcript_keywords = [
+        "show transcript", "display transcript", "show me the transcript",
+        "display the transcript", "view transcript", "see transcript",
+        "full transcript", "entire transcript", "whole transcript",
+        "read transcript", "give me transcript", "get transcript",
+        "transcript please", "show full",
+        # short forms
+        "transcript", "transcripts", "full transcript",
+    ]
+
+    # common misspellings to catch quick typos
+    misspellings = ["transciot", "transcipt", "transcipt", "transciipt", "transcipt", "transciot"]
+
+    should_show = False
+    # direct substring checks
     if any(keyword in question_lower for keyword in show_transcript_keywords):
+        should_show = True
+    # misspelling matches
+    if any(miss in question_lower for miss in misspellings):
+        should_show = True
+    # very short requests like "trans" or just "transcript"
+    if question_lower.strip() in ("trans", "transcript", "show trans"):
+        should_show = True
+    # fuzzy condition: user asks to show/read and mentions 'trans' prefix
+    if ("show" in question_lower or "read" in question_lower or "view" in question_lower) and "trans" in question_lower:
+        should_show = True
+
+    if should_show:
         print(f"✅ Quick answer: Returning full transcript ({len(original_transcript)} chars)")
-        return {'answer': f"Here is the full meeting transcript:\n\n{original_transcript}"}
+        # Return the raw transcript only (no leading phrase) so the frontend displays verbatim
+        return {'answer': original_transcript}
     
     # Quick answer for "who attended" or "who was there"
     if any(phrase in question_lower for phrase in ["who attended", "who was there", "who spoke", "list of speakers"]):
