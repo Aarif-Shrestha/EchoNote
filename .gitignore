@@ -51,3 +51,9 @@ models/*.safetensors
 *.egg-info/
 build/
 dist/
+
+
+
+models/*
+
+!models/.gitkeep
