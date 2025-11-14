@@ -764,6 +764,25 @@ def fetch_transcript_manual(current_user_id, current_username, bot_id):
 def serve_react(path):
     if path.startswith('api/'):
         return jsonify({'error': 'API route not found'}), 404
+    
+    # If dist folder doesn't exist, show backend status
+    if not os.path.exists(REACT_BUILD_DIR):
+        if path == '':
+            return jsonify({
+                'message': 'EchoNote backend is running!',
+                'status': 'healthy',
+                'endpoints': {
+                    'signup': '/api/signup',
+                    'login': '/api/login',
+                    'upload_audio': '/api/upload_audio',
+                    'record_meeting': '/api/record_meeting',
+                    'chat': '/api/chat'
+                }
+            }), 200
+        else:
+            return jsonify({'error': 'Frontend not built. Build React app and deploy dist folder.'}), 404
+    
+    # Serve React files if dist exists
     file_path = os.path.join(REACT_BUILD_DIR, path)
     if path != "" and os.path.exists(file_path):
         return send_from_directory(REACT_BUILD_DIR, path)
