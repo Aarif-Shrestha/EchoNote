@@ -79,10 +79,10 @@ const Login = () => {
     
     {/* <p class="or-divider">Or</p> */}
     
-    <button class="google-btn">
+    {/* <button class="google-btn"> */}
       {/* <img src="/google-icon.png" alt="google" class="btn-icon" /> */}
-      Log in 
-    </button>
+      {/* Log in  */}
+    {/* </button> */}
     
     
     
