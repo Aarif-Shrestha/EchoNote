@@ -775,5 +775,9 @@ if __name__ == '__main__':
     # Start automatic transcript fetcher (polls every 30 seconds)
     start_auto_fetch()
     
+    # Get port from environment (Render sets PORT env var)
+    port = int(os.getenv('PORT', 5000))
+    
     # Run with debug but disable reloader to prevent restart issues with model loading
-    app.run(debug=True, use_reloader=False)
+    # Bind to 0.0.0.0 for Render (required for external access)
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
