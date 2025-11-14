@@ -193,7 +193,7 @@ def get_transcript(bot_id):
                     'message': 'No transcript available yet'
                 }
             
-            # Build formatted transcript with speaker names and timestamps
+            # Build formatted transcript with speaker names and timestamp
             transcript_parts = []
             speakers = set()
             

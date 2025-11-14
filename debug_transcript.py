@@ -18,7 +18,7 @@ print("=" * 60)
 if result.get('raw_data'):
     print("\nRAW TRANSCRIPT SEGMENTS:")
     transcripts = result['raw_data'].get('bot_data', {}).get('transcripts', [])
-    for i, segment in enumerate(transcripts[:5]):  # Show first 5 segments
+    for i, segment in enumerate(transcripts[:5]):  
         print(f"\nSegment {i+1}:")
         print(f"  Speaker: {segment.get('speaker')}")
         print(f"  Words count: {len(segment.get('words', []))}")

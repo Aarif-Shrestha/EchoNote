@@ -14,7 +14,7 @@ import json
 
 load_dotenv()
 
-# File paths
+
 BOT_MEETINGS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'bot_meetings.json')
 AUDIOS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'audios.json')
 TRANSCRIPTS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'transcripts.json')
