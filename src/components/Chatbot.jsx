@@ -79,12 +79,14 @@ const Chatbot = () => {
     if (!handleProtectedAction(e)) return;
     if (!selectedTranscript) return;
     const paragraphs = splitIntoSpeakerParagraphs(selectedTranscript);
-    const newMessages = paragraphs.map(p => ({
+    // Join all paragraphs with double newlines for spacing between speakers
+    const fullTranscript = paragraphs.join('\n\n');
+    const newMessage = {
       sender: 'bot',
-      text: p,
+      text: fullTranscript,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }));
-    setMessages(prev => [...prev, ...newMessages]);
+    };
+    setMessages(prev => [...prev, newMessage]);
     // hide suggestions after showing transcript
     hideSuggestions();
   };
@@ -107,18 +109,18 @@ const Chatbot = () => {
   // Split transcript into speaker paragraphs. It attempts to split before speaker labels like "Speaker 2:" or "Name:"
   const splitIntoSpeakerParagraphs = (text) => {
     if (!text) return [];
+    if (typeof text !== 'string') return [];
+    
     // Normalize newlines
     const norm = text.replace(/\r\n/g, '\n').trim();
-    // Split before occurrences of 'Speaker X:' or any 'Name:' pattern
-    const parts = norm.split(/(?=(?:Speaker\s*\d+:)|(?:[A-Za-z][A-Za-z0-9 .'-]+:))/g)
-      .map(p => p.trim())
+    
+    // Split on double newlines to get paragraphs
+    const paragraphs = norm.split(/\n{2,}/);
+    
+    // Return array of cleaned paragraph strings
+    return paragraphs
+      .map(p => p.replace(/\n/g, ' ').trim())
       .filter(p => p.length > 0);
-    // If splitting produced only one long block, fallback to splitting on double newlines
-    if (parts.length <= 1) {
-      return norm.split(/\n{2,}/).map(p => p.replace(/\n+/g, ' ').trim()).filter(Boolean);
-    }
-    // Clean up internal newlines inside each part
-    return parts.map(p => p.replace(/\n+/g, ' ').trim());
   }
 
   const fetchTranscript = async (meetingId) => {
@@ -212,9 +214,8 @@ const Chatbot = () => {
       misspellings.some(m => qLower.includes(m)) ||
       qLower === "transcript" || qLower === "trans"
     ) {
-      // Return the selected transcript directly (no extra prefix)
-      // Collapse newlines so it appears as one line in chat
-      return selectedTranscript.replace(/\n+/g, ' ');
+      // Return the selected transcript directly (keeping newlines for proper paragraph splitting)
+      return selectedTranscript;
     }
 
     setIsLoading(true);
@@ -292,14 +293,15 @@ const Chatbot = () => {
 
     if (answer) {
       if (isTranscriptQuery(question)) {
-        // Split transcript into paragraphs and insert each as its own bot message
+        // Split transcript into paragraphs and join them in one message
         const paragraphs = splitIntoSpeakerParagraphs(answer);
-        const newMessages = paragraphs.map(p => ({
+        const fullTranscript = paragraphs.join('\n\n');
+        const botMessage = {
           sender: 'bot',
-          text: p,
+          text: fullTranscript,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
-        setMessages(prev => [...prev, ...newMessages]);
+        };
+        setMessages(prev => [...prev, botMessage]);
       } else {
         const botMessage = {
           sender: "bot",
@@ -331,13 +333,15 @@ const Chatbot = () => {
 
     if (answer) {
       if (isTranscriptQuery(question)) {
+        // Split transcript into paragraphs and join them in one message
         const paragraphs = splitIntoSpeakerParagraphs(answer);
-        const newMessages = paragraphs.map(p => ({
+        const fullTranscript = paragraphs.join('\n\n');
+        const botMessage = {
           sender: 'bot',
-          text: p,
+          text: fullTranscript,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
-        setMessages(prev => [...prev, ...newMessages]);
+        };
+        setMessages(prev => [...prev, botMessage]);
       } else {
         const botMessage = {
           sender: "bot",

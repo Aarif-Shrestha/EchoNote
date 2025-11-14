@@ -201,9 +201,13 @@ def get_transcript(bot_id):
                 speaker = segment.get('speaker', 'Unknown Speaker')
                 speakers.add(speaker)
                 
-                # Get all words and combine them
+                # Get all words and combine them with spaces
                 words = segment.get('words', [])
-                text = ''.join([word.get('text', '') for word in words])
+                text = ' '.join([word.get('text', '').strip() for word in words if word.get('text', '').strip()])
+                
+                # Skip empty segments
+                if not text:
+                    continue
                 
                 # Add speaker label and text
                 transcript_parts.append(f"{speaker}: {text.strip()}")

@@ -51,8 +51,17 @@ def check_transcripts():
     updated = False
     
     for bot_id, bot_info in list(bot_meetings.items()):
-        # Skip if already fetched
-        if bot_info.get('transcript_fetched'):
+        # Check if transcript exists and is not empty
+        meeting_id = bot_info.get('meeting_id')
+        user_id = bot_info.get('user_id')
+        transcript_exists = False
+        
+        if meeting_id and user_id:
+            existing_transcript = transcripts.get(user_id, {}).get(meeting_id, {}).get('transcript', '')
+            transcript_exists = existing_transcript and len(existing_transcript.strip()) > 50
+        
+        # Skip if already fetched AND transcript exists with content
+        if bot_info.get('transcript_fetched') and transcript_exists:
             continue
         
         # Check if bot is done and transcript is ready
