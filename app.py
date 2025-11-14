@@ -9,21 +9,30 @@ import json
 import jwt
 import datetime
 import hashlib
+import sys
 
-# Add ffmpeg to PATH for Whisper (Windows fix)
-ffmpeg_paths = [
-    r"C:\ffmpeg\bin",
-    os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0-full_build\bin"),
-    r"C:\ProgramData\chocolatey\bin",
-    os.path.expanduser(r"~\scoop\shims")
-]
-for ffmpeg_path in ffmpeg_paths:
-    if os.path.exists(ffmpeg_path) and ffmpeg_path not in os.environ["PATH"]:
-        os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
-        print(f"✅ Added {ffmpeg_path} to PATH")
-        break
-from asr_model import ASRTranscriber
-from chatbot import is_strict_greeting, ask_ollama, get_greeting_response
+# Add ffmpeg to PATH for Whisper (Windows only)
+if sys.platform == 'win32':
+    ffmpeg_paths = [
+        r"C:\ffmpeg\bin",
+        os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0-full_build\bin"),
+        r"C:\ProgramData\chocolatey\bin",
+        os.path.expanduser(r"~\scoop\shims")
+    ]
+    for ffmpeg_path in ffmpeg_paths:
+        if os.path.exists(ffmpeg_path) and ffmpeg_path not in os.environ["PATH"]:
+            os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
+            print(f"✅ Added {ffmpeg_path} to PATH")
+            break
+
+# Import with error handling for deployment environments
+try:
+    from asr_model import ASRTranscriber
+    from chatbot import is_strict_greeting, ask_ollama, get_greeting_response
+except Exception as e:
+    print(f"⚠️ Warning: Could not load ASR/chatbot modules: {e}")
+    ASRTranscriber = None
+
 from meetingbaas_integration import create_meeting_bot, get_bot_status, get_transcript
 from dotenv import load_dotenv
 from auto_fetch import start_auto_fetch
@@ -61,7 +70,7 @@ transcriber = None
 def get_transcriber():
     """Lazy load the ASR transcriber"""
     global transcriber
-    if transcriber is None:
+    if transcriber is None and ASRTranscriber is not None:
         try:
             print("🔄 Loading Whisper ASR model...")
             transcriber = ASRTranscriber()  # Whisper loads its own model
