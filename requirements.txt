@@ -1,19 +1,13 @@
-flask==3.0.0
-flask-cors==4.0.0
-PyJWT==2.8.0
-werkzeug==3.0.0
-torch==2.1.0
-librosa==0.10.1
-numpy==1.24.3
+flask==3.1.2
+flask-cors==6.0.1
+PyJWT==2.10.1
+werkzeug==3.1.3
+torch==2.8.0
+librosa==0.11.0
+numpy==2.1.3
 python-dotenv==1.1.0
-requests==2.31.0
-
-# Additional dependencies used by the project
-# Whisper ASR (OpenAI Whisper)
-openai-whisper
-# Optional speaker diarization / audio models
-speechbrain
-# Scikit-learn for clustering (used if available)
-scikit-learn
-# PySoundFile required by librosa for some audio backends
-soundfile
+requests==2.32.5
+openai-whisper==20250625
+speechbrain==1.0.3
+scikit-learn==1.5.1
+soundfile==0.13.1

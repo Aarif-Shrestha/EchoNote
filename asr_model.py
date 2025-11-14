@@ -5,6 +5,7 @@ import torch
 import librosa
 import numpy as np
 import whisper
+import os
 
 # Try to import speaker diarization - make it optional
 try:
