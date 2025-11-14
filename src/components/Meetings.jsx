@@ -76,15 +76,16 @@ const Meetings = () => {
         return;
       }
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setTranscript(data.transcript);
-        setUploadStatus('✅ Transcription complete!');
-        setSelectedFile(null);
-      } else {
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Server error' }));
         setUploadStatus(`Error: ${data.error}`);
+        return;
       }
+
+      const data = await response.json();
+      setTranscript(data.transcript);
+      setUploadStatus('✅ Transcription complete!');
+      setSelectedFile(null);
     } catch (error) {
       setUploadStatus(`Error: ${error.message}`);
     } finally {
