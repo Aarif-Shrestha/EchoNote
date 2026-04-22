@@ -144,7 +144,7 @@ MIT License - see LICENSE file for details
 
 ##  Contributors
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Aarif Shrestha , YUg Adhikari
 
 ##  Issues
 
