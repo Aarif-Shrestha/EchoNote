@@ -1,8 +1,8 @@
-# 🎙️ Echo Note
+#  Echo Note
 
 AI-powered meeting transcription and chatbot assistant using PyTorch ASR and Ollama.
 
-## ✨ Features
+##  Features
 
 - 🎵 **Audio Transcription** - Upload audio files and get AI-generated transcripts
 - 🎥 **Live Meeting Recording** - Paste meeting URLs (Zoom/Meet/Teams) and let Echo Note Bot join and transcribe automatically
@@ -16,7 +16,7 @@ AI-powered meeting transcription and chatbot assistant using PyTorch ASR and Oll
     https://drive.google.com/file/d/1KMtQ-ruvNoCU5OlGZpqQ-M43yb7dQ7EV/view?usp=sharing
 
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.12+
@@ -99,7 +99,7 @@ echo-note/
 └── dist/              # Production build
 ```
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Backend
 - **Flask** - Web framework
@@ -131,22 +131,22 @@ echo-note/
 5. **Get Transcript** - Transcript appears after meeting ends
 6. **Chat** - Ask AI questions about the recorded meeting
 
-## 🔒 Security
+##  Security
 
 - Passwords hashed with Werkzeug
 - JWT tokens with 24-hour expiry
 - Per-user data isolation
 - MD5 file hashing for duplicate detection
 
-## 📝 License
+##  License
 
 MIT License - see LICENSE file for details
 
-## 👥 Contributors
+##  Contributors
 
 Made with ❤️ by [Your Name]
 
-## 🐛 Issues
+##  Issues
 
 Found a bug? [Open an issue](https://github.com/yourusername/echo-note/issues)
 
