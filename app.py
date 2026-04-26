@@ -11,7 +11,7 @@ import datetime
 import hashlib
 import sys
 
-# Add ffmpeg to PATH for Whisper (Windows only)
+# Add ffmpeg  PATH for Whisper (Windows only)
 if sys.platform == 'win32':
     ffmpeg_paths = [
         r"C:\ffmpeg\bin",
@@ -43,12 +43,12 @@ load_dotenv()
 # Path to React build folder
 REACT_BUILD_DIR = os.path.join(os.path.dirname(__file__), 'dist')
 
-# Data storage paths
+# All are Data storage paths
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'users.json')
 AUDIOS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'audios.json')
 TRANSCRIPTS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'transcripts.json')
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
-# Note: Whisper loads its own model, no custom path needed
+# Note: Whisper loads its own model (no custom one needed)
 
 # Allowed audio file extensions
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'webm'}
