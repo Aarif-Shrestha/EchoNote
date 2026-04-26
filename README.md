@@ -146,9 +146,6 @@ MIT License - see LICENSE file for details
 
 Made with ❤️ by Aarif Shrestha , YUg Adhikari, Kasmita Koirala and Siddhant Shrestha
 
-##  Issues
-
-Found a bug? [Open an issue](https://github.com/yourusername/echo-note/issues)
 
 ## Large model files (important)
 
