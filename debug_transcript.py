@@ -1,6 +1,7 @@
 """
 Debug script to see raw MeetingBaas transcript data
 """
+# meetingbaas is the api we called 
 from meetingbaas_integration import get_transcript
 import json
 
