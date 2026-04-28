@@ -3,6 +3,8 @@ Automatic transcript fetcher for MeetingBaas - polls every 30 seconds
 Fetches transcripts directly via API - NO downloads needed!
 """
 
+# main fucntion is to like keep fetching the transcript fomr the meetingbaas every 30 seconds
+
 import time
 import threading
 import os
